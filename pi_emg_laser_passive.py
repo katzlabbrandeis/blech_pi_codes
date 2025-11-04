@@ -7,6 +7,8 @@ import numpy as np
 import os
 import random
 import ast
+from itertools import combinations
+from pprint import pprint as pp
 
 # The BOARD mode allows referring to the GPIO pins by their number on the board
 GPIO.setmode(GPIO.BOARD)
@@ -431,6 +433,95 @@ def passive_with_lasers(outports = [16, 18, 21, 22, 23, 24], intan_inports = [40
 		# Wait for the iti before delivering next taste
 		time.sleep(iti)
 		
+def passive_parametric_pairwise(
+		outports = [16, 18, 21, 22], 
+		intan_inports = [40, 37, 35, 33], 
+		tastes = ['water', 'saccharin', 'salt', 'concqui'],
+		opentimes = [0.010, 0.010, 0.010, 0.010],
+		iti = 15,
+		n_total_trials = 120,
+		):
+	"""
+	Given set of tastes, deliver them in pairwise combinations with varying mixing ratios.
+	Delivers both tastes in a pair simultaneously, with open times scaled according to mixing ratio.
+	"""
+	
+	# Make dict of stims
+	stim_dict = {}
+	for i in range(len(outports)):
+		stim_dict[tastes[i]] = dict(
+			outport = outports[i],
+			intan_inport = intan_inports[i],
+			opentime = opentimes[i],
+			)
+
+	print("Stimulus dictionary:")
+	pp(stim_dict)
+
+	all_stim_combos = list(combinations(tastes, 2))
+	print("\nAll stimulus combinations:")
+	pp(all_stim_combos)
+
+	mixing_steps = n_total_trials // len(all_stim_combos)
+	mixing_fractions = np.round(np.linspace(0, 1, mixing_steps),2)
+
+	print(f"\nMixing fractions to be used ({len(mixing_fractions)}):")
+	print(mixing_fractions)
+
+	delivery_combos = np.repeat(np.array(all_stim_combos), len(mixing_fractions), axis=0)
+	delivery_mixing_fractions = np.tile(mixing_fractions, len(all_stim_combos))
+
+	# Randomize order
+	combined = list(zip(delivery_combos, delivery_mixing_fractions))
+	random.shuffle(combined)
+
+	# Setup pi board GPIO ports
+	GPIO.setmode(GPIO.BOARD)
+	for i in outports:
+		GPIO.setup(i, GPIO.OUT)
+	for i in intan_inports:
+		GPIO.setup(i, GPIO.OUT)
+
+	# Deliver trials
+
+	for trial_num, (stim_pair, mix_frac) in enumerate(combined):
+		stim1, stim2 = stim_pair
+		stim1_frac = mix_frac
+		stim2_frac = np.round(1 - mix_frac,2)
+
+		stim1_opentime = np.round(stim_dict[stim1]['opentime'] * stim1_frac,4)
+		stim2_opentime = np.round(stim_dict[stim2]['opentime'] * stim2_frac,4)
+
+		print(f"""
+
+		Trial {trial_num+1} of {n_total_trials}:
+		Stimuli: {stim1} ({stim1_frac*100}%), {stim2} ({stim2_frac*100}%)
+		Opentimes: {stim1_opentime}s, {stim2_opentime}s
+
+		""")
+
+		delta_t = np.abs(stim1_opentime - stim2_opentime)
+		smaller_stim = stim1 if stim1_opentime < stim2_opentime else stim2
+		larger_stim = stim2 if stim1_opentime < stim2_opentime else stim1
+
+		# Deliver both tastes
+		GPIO.output(stim_dict[stim1]['outport'], 1)
+		GPIO.output(stim_dict[stim1]['intan_inport'], 1)
+		GPIO.output(stim_dict[stim2]['outport'], 1)
+		GPIO.output(stim_dict[stim2]['intan_inport'], 1)
+		# Wait for smaller opentime
+		time.sleep(min(stim1_opentime, stim2_opentime))
+		# Stop smaller stim
+		GPIO.output(stim_dict[smaller_stim]['outport'], 0)
+		GPIO.output(stim_dict[smaller_stim]['intan_inport'], 0)
+		# Wait remaining time for larger stim
+		time.sleep(delta_t)
+		# Stop larger stim
+		GPIO.output(stim_dict[larger_stim]['outport'], 0)
+		GPIO.output(stim_dict[larger_stim]['intan_inport'], 0)
+		# Wait ITI
+		print(f"Trial {trial_num+1} completed. Waiting {iti}s before next trial.\n")
+		time.sleep(iti)
 
 
 # Passive deliveries with video and lasers can be fired singly
