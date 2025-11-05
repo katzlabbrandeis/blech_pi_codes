@@ -87,10 +87,19 @@ def passive(outport = 16, opentime = 0.015, iti = 15, trials = 100):
 	print('Passive deliveries completed')
 
 # Passive deliveries with video recordings and laser inactivation
-def passive_with_video_and_lasers(outports = [16, 18, 21, 22, 23, 24], intan_inports = [40, 37, 35, 33, 32, 31], tastes = ['NaCl', 'Sucrose', 'citriacid', 'quinine', 'a', 'b'], opentimes = [0.1, 0.1, 0.010, 0.010, 0.010, 0.010], iti = 20, repeats = 30):
+def passive_with_video_and_lasers(
+		outports = [16, 18, 21, 22, 23, 24], 
+		intan_inports = [40, 37, 35, 33, 32, 31], 
+		tastes = ['NaCl', 'Sucrose', 'citriacid', 'quinine', 'a', 'b'], 
+		opentimes = [0.1, 0.1, 0.010, 0.010, 0.010, 0.010], 
+		iti = 20, 
+		repeats = 30):
 
 	# Get the number of different inactivation windows to be used from the user and convert to integer
-	num_windows = easygui.multenterbox(msg = 'How many different inactivation windows do you want to use? (greater than 0 - do not use laser code if you do not want to inactivate)', fields = ['# of different inactivation windows in the experiment'])
+	num_windows = easygui.multenterbox(
+			msg = 'How many different inactivation windows do you want to use? (greater than 0 - do not use laser code if you do not want to inactivate)', 
+			fields = ['# of different inactivation windows in the experiment']
+			)
 	num_windows = int(num_windows[0])
 
 	# Set the outports to outputs
@@ -477,10 +486,15 @@ def passive_parametric_pairwise(
 
 	# Setup pi board GPIO ports
 	GPIO.setmode(GPIO.BOARD)
+	# Set the outports to outputs
 	for i in outports:
 		GPIO.setup(i, GPIO.OUT)
+		# Set starting state to 0
+		GPIO.output(i, 0)
+	# Set the input lines for Intan to outputs
 	for i in intan_inports:
 		GPIO.setup(i, GPIO.OUT)
+		GPIO.output(i, 0)
 
 	# Deliver trials
 
@@ -522,6 +536,8 @@ def passive_parametric_pairwise(
 		# Wait ITI
 		print(f"Trial {trial_num+1} completed. Waiting {iti}s before next trial.\n")
 		time.sleep(iti)
+
+	print("All trials completed.")
 
 
 # Passive deliveries with video and lasers can be fired singly
